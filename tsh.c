@@ -179,6 +179,12 @@ void eval(char *cmdline)
             exit(1);
         } else if(cpid == 0) {
             /* child */
+            char *path, *delim, *
+            path = getenv("PATH");
+            printf(path);
+            while(delim = strchr(path, ":")) {
+            }
+            
             if(execve(argv[0], argv, NULL) == -1) {
                 printf("execve error\n");
                 exit(1);
