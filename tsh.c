@@ -1,7 +1,7 @@
 /* 
  * tsh - A tiny shell program with job control
  * 
- * <Put your name and login ID here>
+ * 2017302580093-Chengkai Zhang
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +24,8 @@
 #define FG 1    /* running in foreground */
 #define BG 2    /* running in background */
 #define ST 3    /* stopped */
+
+typedef int bool;
 
 /* 
  * Jobs states: FG (foreground), BG (background), ST (stopped)
@@ -165,6 +167,15 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+    char **parg;
+    char *argv[MAXARGS];
+    int is_bg;
+    is_bg = parseline(cmdline, argv);
+    parg = argv;
+    while(*parg) {
+        printf("%s\n", *parg);
+        parg++;
+    } 
     return;
 }
 
@@ -199,6 +210,8 @@ int parseline(const char *cmdline, char **argv)
     }
 
     while (delim) {
+        if(argc >= MAXARGS-1)
+            break;
 	argv[argc++] = buf;
 	*delim = '\0';
 	buf = delim + 1;
