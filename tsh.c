@@ -171,6 +171,8 @@ void eval(char *cmdline)
     char *argv[MAXARGS];
     int is_bg;
     is_bg = parseline(cmdline, argv);
+    if(builtin_cmd(argv))
+        return;
     parg = argv;
     while(*parg) {
         printf("%s\n", *parg);
@@ -244,6 +246,9 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
+    char *cmd = argv[0];
+    if(!strcmp(cmd, "quit"))
+        exit(0);
     return 0;     /* not a builtin command */
 }
 
