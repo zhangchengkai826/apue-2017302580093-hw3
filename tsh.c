@@ -167,17 +167,28 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
-    char **parg;
     char *argv[MAXARGS];
     int is_bg;
     is_bg = parseline(cmdline, argv);
     if(builtin_cmd(argv))
         return;
-    parg = argv;
-    while(*parg) {
-        printf("%s\n", *parg);
-        parg++;
-    } 
+    if(!is_bg){
+        pid_t cpid = fork();
+        if(cpid == -1) {
+            printf("fork error\n");
+            exit(1);
+        } else if(cpid == 0) {
+            /* child */
+            if(execve(argv[0], argv, NULL) == -1) {
+                printf("execve error\n");
+                exit(1);
+            }
+        } else {
+            /* parent */
+            int wstatus;
+            waitpid(cpid, &wstatus, WUNTRACED);
+        }
+    }
     return;
 }
 
