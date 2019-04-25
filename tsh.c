@@ -170,6 +170,8 @@ void eval(char *cmdline)
     char *argv[MAXARGS];
     int is_bg;
     is_bg = parseline(cmdline, argv);
+    if(argv[0] == NULL)
+      return;
     if(builtin_cmd(argv))
         return;
     if(!is_bg){
@@ -179,16 +181,26 @@ void eval(char *cmdline)
             exit(1);
         } else if(cpid == 0) {
             /* child */
-            char *path, *delim, *
-            path = getenv("PATH");
-            printf(path);
-            while(delim = strchr(path, ":")) {
-            }
+            char *pathenv, *delim;
+
+            execve(argv[0], argv, NULL);
+
+            pathenv = getenv("PATH");
             
-            if(execve(argv[0], argv, NULL) == -1) {
-                printf("execve error\n");
-                exit(1);
+            while(delim = strchr(pathenv, ':')) {
+              char fullpath[MAXLINE];
+              *delim = '\0';
+              sprintf(fullpath, "%s/%s", pathenv, argv[0]);
+
+              /* if succeed, not return */
+              execve(fullpath, argv, NULL);
+              pathenv = delim + 1;
             }
+            char fullpath[MAXLINE];
+            sprintf(fullpath, "%s/%s", pathenv, argv[0]);
+            execve(fullpath, argv, NULL);
+            printf("%s: Command not found\n", argv[0]);
+            
         } else {
             /* parent */
             int wstatus;
