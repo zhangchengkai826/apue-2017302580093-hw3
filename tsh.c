@@ -175,6 +175,13 @@ void eval(char *cmdline)
     if(builtin_cmd(argv))
         return;
     if(!is_bg){
+        sigset_t sigset;
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGCHLD);
+        if(sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
+          printf("sigprocmask error\n");
+          exit(1);
+        }
         pid_t cpid = fork();
         if(cpid == -1) {
             printf("fork error\n");
@@ -182,6 +189,7 @@ void eval(char *cmdline)
         } else if(cpid == 0) {
             /* child */
             char *pathenv, *delim;
+            sigprocmask(SIG_UNBLOCK, &sigset, NULL);
 
             execve(argv[0], argv, NULL);
 
@@ -203,6 +211,8 @@ void eval(char *cmdline)
             
         } else {
             /* parent */
+            addjob(jobs, cpid, FG, cmdline);
+            sigprocmask(SIG_UNBLOCK, &sigset, NULL);
             int wstatus;
             waitpid(cpid, &wstatus, WUNTRACED);
         }
