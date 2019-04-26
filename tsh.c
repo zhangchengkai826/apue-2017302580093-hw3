@@ -174,48 +174,55 @@ void eval(char *cmdline)
       return;
     if(builtin_cmd(argv))
         return;
-    if(!is_bg){
-        sigset_t sigset;
-        sigemptyset(&sigset);
-        sigaddset(&sigset, SIGCHLD);
-        if(sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
-          printf("sigprocmask error\n");
-          exit(1);
-        }
-        pid_t cpid = fork();
-        if(cpid == -1) {
-            printf("fork error\n");
-            exit(1);
-        } else if(cpid == 0) {
-            /* child */
-            char *pathenv, *delim;
-            sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGCHLD);
+    if(sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
+        printf("sigprocmask error\n");
+        exit(1);
+    }
+    pid_t cpid = fork();
+    if(cpid == -1) {
+        printf("fork error\n");
+        exit(1);
+    } else if(cpid == 0) {
+        /* child */
+        char *pathenv, *delim;
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
 
-            execve(argv[0], argv, NULL);
+        execve(argv[0], argv, NULL);
 
-            pathenv = getenv("PATH");
+        pathenv = getenv("PATH");
             
-            while(delim = strchr(pathenv, ':')) {
-              char fullpath[MAXLINE];
-              *delim = '\0';
-              sprintf(fullpath, "%s/%s", pathenv, argv[0]);
-
-              /* if succeed, not return */
-              execve(fullpath, argv, NULL);
-              pathenv = delim + 1;
-            }
+        while(delim = strchr(pathenv, ':')) {
             char fullpath[MAXLINE];
+            *delim = '\0';
             sprintf(fullpath, "%s/%s", pathenv, argv[0]);
+
+            /* if succeed, not return */
             execve(fullpath, argv, NULL);
-            printf("%s: Command not found\n", argv[0]);
-            
-        } else {
-            /* parent */
-            addjob(jobs, cpid, FG, cmdline);
-            sigprocmask(SIG_UNBLOCK, &sigset, NULL);
-            int wstatus;
-            waitpid(cpid, &wstatus, WUNTRACED);
+            pathenv = delim + 1;
         }
+        char fullpath[MAXLINE];
+        sprintf(fullpath, "%s/%s", pathenv, argv[0]);
+        execve(fullpath, argv, NULL);
+        printf("%s: Command not found\n", argv[0]);
+          
+    } else {
+        /* parent */
+        int jobstate;
+        jobstate = FG;
+        if(is_bg) 
+          jobstate = BG;
+        addjob(jobs, cpid, jobstate, cmdline);
+        if(is_bg) {
+          struct job_t *nj;
+          nj = getjobjid(jobs, maxjid(jobs));
+          printf("[%d] (%d) %s", nj->jid, nj->pid, nj->cmdline);
+        }
+        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+        waitpid(cpid, NULL, WNOHANG);
+        waitfg(cpid); /* if is_bg, return immediately */
     }
     return;
 }
@@ -304,6 +311,12 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
+    while(1) {
+        struct job_t *j;
+        j = getjobpid(jobs, pid);
+        if(!j || j->state != FG) break;
+        usleep(100);
+    }
     return;
 }
 
@@ -320,6 +333,17 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
+    int wstatus, i;
+    struct job_t *j;
+    j = jobs;
+    for(i = 0; i < MAXJOBS; i++) {
+        if(j->state != UNDEF && j->state != ST) {
+            waitpid(j->pid, &wstatus, WUNTRACED);
+            if(WIFSTOPPED(wstatus)) j->state = ST;
+            else if(WIFEXITED(wstatus)) deletejob(jobs, j->pid);
+        }
+        j++;
+    }
     return;
 }
 
