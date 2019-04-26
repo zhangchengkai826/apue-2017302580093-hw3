@@ -295,6 +295,19 @@ int builtin_cmd(char **argv)
     char *cmd = argv[0];
     if(!strcmp(cmd, "quit"))
         exit(0);
+    else if(!strcmp(cmd, "jobs")) {
+        int i;
+        struct job_t *j;
+        j = jobs;
+        for(i = 0; i < MAXJOBS; i++) {
+            if(j->state == ST)
+                printf("[%d] (%d) Not Running %s", j->jid, j->pid, j->cmdline);
+            else if(j->state == BG)
+                printf("[%d] (%d) Running %s", j->jid, j->pid, j->cmdline);
+            j++;
+        }
+        return 1;
+    }
     return 0;     /* not a builtin command */
 }
 
@@ -337,8 +350,8 @@ void sigchld_handler(int sig)
     struct job_t *j;
     j = jobs;
     for(i = 0; i < MAXJOBS; i++) {
-        if(j->state != UNDEF && j->state != ST) {
-            waitpid(j->pid, &wstatus, WUNTRACED);
+        if(j->state != UNDEF || j->state != ST) {
+            waitpid(j->pid, &wstatus, WUNTRACED | WNOHANG);
             if(WIFSTOPPED(wstatus)) j->state = ST;
             else if(WIFEXITED(wstatus)) deletejob(jobs, j->pid);
         }
