@@ -354,6 +354,10 @@ void sigchld_handler(int sig)
             waitpid(j->pid, &wstatus, WUNTRACED | WNOHANG);
             if(WIFSTOPPED(wstatus)) j->state = ST;
             else if(WIFEXITED(wstatus)) deletejob(jobs, j->pid);
+            /*else if(WIFSIGNALED(wstatus)) {
+                printf("Job [%d] (%d) terminated by signal %d", j->jid, j->pid, WTERMSIG(wstatus));
+                deletejob(jobs, j->pid);
+            }*/
         }
         j++;
     }
