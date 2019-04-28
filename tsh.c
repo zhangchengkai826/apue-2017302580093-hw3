@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <time.h>
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -87,6 +88,9 @@ void app_error(char *msg);
 typedef void handler_t(int);
 handler_t *Signal(int signum, handler_t *handler);
 
+/* debug log */
+FILE *logout;
+
 /*
  * main - The shell's main routine 
  */
@@ -95,7 +99,11 @@ int main(int argc, char **argv)
     char c;
     char cmdline[MAXLINE];
     int emit_prompt = 1; /* emit prompt (default) */
+    time_t ct;
 
+    logout = fopen("log", "a");
+    ct = time(NULL);
+    fprintf(logout, "### Log at %s", ctime(&ct));
     /* Redirect stderr to stdout (so that driver will get all output
      * on the pipe connected to stdout) */
     dup2(1, 2);
@@ -210,6 +218,10 @@ void eval(char *cmdline)
           
     } else {
         /* parent */
+        time_t ct;
+        ct = time(NULL);
+        fprintf(logout, "add %s%s\n", cmdline, ctime(&ct));
+
         int jobstate;
         jobstate = FG;
         if(is_bg) 
@@ -220,7 +232,10 @@ void eval(char *cmdline)
           nj = getjobjid(jobs, maxjid(jobs));
           printf("[%d] (%d) %s", nj->jid, nj->pid, nj->cmdline);
         }
-        sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+        if(sigprocmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
+            printf("sigprocmask error\n");
+            exit(1);
+        }
         waitpid(cpid, NULL, WNOHANG);
         waitfg(cpid); /* if is_bg, return immediately */
     }
@@ -293,19 +308,11 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv) 
 {
     char *cmd = argv[0];
-    if(!strcmp(cmd, "quit"))
+    if(!strcmp(cmd, "quit")) {
         exit(0);
+    }
     else if(!strcmp(cmd, "jobs")) {
-        int i;
-        struct job_t *j;
-        j = jobs;
-        for(i = 0; i < MAXJOBS; i++) {
-            if(j->state == ST)
-                printf("[%d] (%d) Not Running %s", j->jid, j->pid, j->cmdline);
-            else if(j->state == BG)
-                printf("[%d] (%d) Running %s", j->jid, j->pid, j->cmdline);
-            j++;
-        }
+        listjobs(jobs);
         return 1;
     }
     return 0;     /* not a builtin command */
@@ -327,8 +334,13 @@ void waitfg(pid_t pid)
     while(1) {
         struct job_t *j;
         j = getjobpid(jobs, pid);
+        if(j) { 
+            time_t ct;
+            ct = time(NULL);
+            fprintf(logout, "wait for %s%s\n", j->cmdline, ctime(&ct));
+        }
         if(!j || j->state != FG) break;
-        usleep(100);
+        usleep(50);
     }
     return;
 }
@@ -346,14 +358,28 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    int wstatus, i;
+    int i;
     struct job_t *j;
     j = jobs;
     for(i = 0; i < MAXJOBS; i++) {
-        if(j->state != UNDEF || j->state != ST) {
-            waitpid(j->pid, &wstatus, WUNTRACED | WNOHANG);
-            if(WIFSTOPPED(wstatus)) j->state = ST;
-            else if(WIFEXITED(wstatus)) deletejob(jobs, j->pid);
+        if(j->state != UNDEF && j->state != ST) {
+            int wstatus, hr;
+            time_t ct;
+            ct = time(NULL);
+            hr = waitpid(j->pid, &wstatus, WUNTRACED | WNOHANG);
+            if(hr < 0 && errno != EINTR) {
+                fprintf(logout, "waitpid error: %d\n\n", errno);
+                exit(1);
+            } else if(hr > 0) {
+                if(WIFSTOPPED(wstatus)) j->state = ST;
+                else if(WIFEXITED(wstatus)) {
+                    fprintf(logout, "del %s%s\n", j->cmdline, ctime(&ct));
+                    deletejob(jobs, j->pid);
+                }
+                else {
+                    fprintf(logout, "run %s%s\n", j->cmdline, ctime(&ct));
+                }
+            }
             /*else if(WIFSIGNALED(wstatus)) {
                 printf("Job [%d] (%d) terminated by signal %d", j->jid, j->pid, WTERMSIG(wstatus));
                 deletejob(jobs, j->pid);
