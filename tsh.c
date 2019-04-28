@@ -375,7 +375,10 @@ void sigchld_handler(int sig)
                 fprintf(logout, "waitpid error: %d\n\n", errno);
                 exit(1);
             } else if(hr > 0) {
-                if(WIFSTOPPED(wstatus)) j->state = ST;
+                if(WIFSTOPPED(wstatus)) {
+                    printf("Job [%d] (%d) stopped by signal %d\n", j->jid, j->pid, WSTOPSIG(wstatus));
+                    j->state = ST;
+                }
                 else if(WIFEXITED(wstatus)) {
                     fprintf(logout, "del %s%s\n", j->cmdline, ctime(&ct));
                     deletejob(jobs, j->pid);
@@ -415,6 +418,10 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+    if(kill(-fgpid(jobs), SIGTSTP) == -1) {
+        printf("kill error");
+        exit(1);
+    }
     return;
 }
 
