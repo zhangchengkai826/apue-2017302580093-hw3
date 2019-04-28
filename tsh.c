@@ -319,6 +319,10 @@ int builtin_cmd(char **argv)
         listjobs(jobs);
         return 1;
     }
+    else if(!strcmp(argv[0], "fg") || !strcmp(argv[0], "bg")) {
+        do_bgfg(argv);
+        return 1;
+    }
     return 0;     /* not a builtin command */
 }
 
@@ -327,6 +331,20 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+    int jid;
+    struct job_t *j;
+    jid = atoi(argv[1]+1);
+    j = getjobjid(jobs, jid);
+    if(!strcmp(argv[0], "bg")) {
+        if(j) { 
+            if(kill(j->pid, SIGCONT) == -1) {
+                printf("kill error");
+                exit(1);
+            }
+            j->state = BG;
+            printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
+        }
+    }    
     return;
 }
 
