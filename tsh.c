@@ -219,6 +219,7 @@ void eval(char *cmdline)
         sprintf(fullpath, "%s/%s", pathenv, argv[0]);
         execve(fullpath, argv, NULL);
         printf("%s: Command not found\n", argv[0]);
+        exit(1);
           
     } else {
         /* parent */
@@ -332,22 +333,46 @@ int builtin_cmd(char **argv)
 void do_bgfg(char **argv) 
 {
     int jid, pid;
-    struct job_t *j;
     if(!argv[1]) {
         printf("%s command requires PID or %%jobid argument\n", argv[0]);
         return;
     }
-    if(!isdigit(argv[1][0]) && argv[1][0] != '%') {
-        printf("%s: argument must be a PID or %%jobid\n", argv[0]);
-        return;
-    } /* not good */
     
     if(!strcmp(argv[0], "bg")) {
+        struct job_t *j;
         if(argv[1][0] == '%') {        
-            jid = atoi(argv[1]+1);
+            int i;
+            char *endptr;
+            jid = strtol(argv[1]+1, &endptr, 10);
+            if(*endptr != '\0') {
+                printf("%s: argument must be a PID or %%jobid argument\n", argv[0]);
+                return;
+            }
+            for(i = 0; i < MAXJOBS; i++) {
+                if(jobs[i].state != UNDEF && jobs[i].jid == jid)
+                    goto bg_kill_jid;
+            }
+            printf("%%%d: No such job\n", jid);
+            return;
+bg_kill_jid:
             j = getjobjid(jobs, jid);
             pid = j->pid;
-        } else pid = atoi(argv[1]);
+        } else {
+            int i;
+            char *endptr;
+            pid = strtol(argv[1], &endptr, 10);
+            if(*endptr != '\0') {
+                printf("%s: argument must be a PID or %%jobid argument\n", argv[0]);
+                return;
+            }
+            for(i = 0; i < MAXJOBS; i++) {
+                if(jobs[i].state != UNDEF && jobs[i].pid == pid)
+                    goto bg_kill;
+            }
+            printf("(%d): No such process\n", pid);
+            return;
+        }
+bg_kill:
         if(kill(-pid, SIGCONT) == -1) {
             printf("kill error");
             exit(1);
@@ -356,11 +381,40 @@ void do_bgfg(char **argv)
         j->state = BG;
         printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
     } else if(!strcmp(argv[0], "fg")) {
+        struct job_t *j;
         if(argv[1][0] == '%') {        
-            jid = atoi(argv[1]+1);
+            int i;
+            char *endptr;
+            jid = strtol(argv[1]+1, &endptr, 10);
+            if(*endptr != '\0') {
+                printf("%s: argument must be a PID or %%jobid argument\n", argv[0]);
+                return;
+            }
+            for(i = 0; i < MAXJOBS; i++) {
+                if(jobs[i].state != UNDEF && jobs[i].jid == jid)
+                    goto fg_kill_jid;
+            }
+            printf("%%%d: No such job\n", jid);
+            return;
+fg_kill_jid:
             j = getjobjid(jobs, jid);
             pid = j->pid;
-        } else pid = atoi(argv[1]);
+        } else {
+            int i;
+            char *endptr;
+            pid = strtol(argv[1], &endptr, 10);
+            if(*endptr != '\0') {
+                printf("%s: argument must be a PID or %%jobid argument\n", argv[0]);
+                return;
+            }
+            for(i = 0; i < MAXJOBS; i++) {
+                if(jobs[i].state != UNDEF && jobs[i].pid == pid)
+                    goto fg_kill;
+            }
+            printf("(%d): No such process\n", pid);
+            return;
+        }
+fg_kill:
         if(kill(-j->pid, SIGCONT) == -1) {
             printf("kill error");
             exit(1);
