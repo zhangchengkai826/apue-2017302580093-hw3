@@ -337,7 +337,7 @@ void do_bgfg(char **argv)
     j = getjobjid(jobs, jid);
     if(!strcmp(argv[0], "bg")) {
         if(j) { 
-            if(kill(j->pid, SIGCONT) == -1) {
+            if(kill(-j->pid, SIGCONT) == -1) {
                 printf("kill error");
                 exit(1);
             }
@@ -346,7 +346,7 @@ void do_bgfg(char **argv)
         }
     } else if(!strcmp(argv[0], "fg")) {
         if(j) { 
-            if(kill(j->pid, SIGCONT) == -1) {
+            if(kill(-j->pid, SIGCONT) == -1) {
                 printf("kill error");
                 exit(1);
             }
