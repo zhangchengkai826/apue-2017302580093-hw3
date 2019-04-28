@@ -331,28 +331,43 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
-    int jid;
+    int jid, pid;
     struct job_t *j;
-    jid = atoi(argv[1]+1);
-    j = getjobjid(jobs, jid);
+    if(!argv[1]) {
+        printf("%s command requires PID or %%jobid argument\n", argv[0]);
+        return;
+    }
+    if(!isdigit(argv[1][0]) && argv[1][0] != '%') {
+        printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+        return;
+    } /* not good */
+    
     if(!strcmp(argv[0], "bg")) {
-        if(j) { 
-            if(kill(-j->pid, SIGCONT) == -1) {
-                printf("kill error");
-                exit(1);
-            }
-            j->state = BG;
-            printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
+        if(argv[1][0] == '%') {        
+            jid = atoi(argv[1]+1);
+            j = getjobjid(jobs, jid);
+            pid = j->pid;
+        } else pid = atoi(argv[1]);
+        if(kill(-pid, SIGCONT) == -1) {
+            printf("kill error");
+            exit(1);
         }
+        j = getjobpid(jobs, pid);
+        j->state = BG;
+        printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
     } else if(!strcmp(argv[0], "fg")) {
-        if(j) { 
-            if(kill(-j->pid, SIGCONT) == -1) {
-                printf("kill error");
-                exit(1);
-            }
-            j->state = FG;
-            waitfg(j->pid);
+        if(argv[1][0] == '%') {        
+            jid = atoi(argv[1]+1);
+            j = getjobjid(jobs, jid);
+            pid = j->pid;
+        } else pid = atoi(argv[1]);
+        if(kill(-j->pid, SIGCONT) == -1) {
+            printf("kill error");
+            exit(1);
         }
+        j = getjobpid(jobs, pid);
+        j->state = FG;
+        waitfg(j->pid);
     }   
     return;
 }
