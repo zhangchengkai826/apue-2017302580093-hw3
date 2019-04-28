@@ -344,7 +344,16 @@ void do_bgfg(char **argv)
             j->state = BG;
             printf("[%d] (%d) %s", j->jid, j->pid, j->cmdline);
         }
-    }    
+    } else if(!strcmp(argv[0], "fg")) {
+        if(j) { 
+            if(kill(j->pid, SIGCONT) == -1) {
+                printf("kill error");
+                exit(1);
+            }
+            j->state = FG;
+            waitfg(j->pid);
+        }
+    }   
     return;
 }
 
