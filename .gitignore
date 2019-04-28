@@ -6,6 +6,7 @@ mystop
 tsh
 *~
 *.swp
+log
 
 # Prerequisites
 *.d

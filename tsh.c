@@ -197,6 +197,10 @@ void eval(char *cmdline)
         /* child */
         char *pathenv, *delim;
         sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+        if(setpgid(0, 0) == -1) {
+            printf("setpgid error");
+            exit(1);
+        }
 
         execve(argv[0], argv, NULL);
 
@@ -376,14 +380,14 @@ void sigchld_handler(int sig)
                     fprintf(logout, "del %s%s\n", j->cmdline, ctime(&ct));
                     deletejob(jobs, j->pid);
                 }
+                else if(WIFSIGNALED(wstatus)) {
+                    printf("Job [%d] (%d) terminated by signal %d\n", j->jid, j->pid, WTERMSIG(wstatus));
+                    deletejob(jobs, j->pid);
+                }
                 else {
                     fprintf(logout, "run %s%s\n", j->cmdline, ctime(&ct));
                 }
             }
-            /*else if(WIFSIGNALED(wstatus)) {
-                printf("Job [%d] (%d) terminated by signal %d", j->jid, j->pid, WTERMSIG(wstatus));
-                deletejob(jobs, j->pid);
-            }*/
         }
         j++;
     }
@@ -397,6 +401,10 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+    if(kill(-fgpid(jobs), SIGINT) == -1) {
+        printf("kill error");
+        exit(1);
+    }
     return;
 }
 
